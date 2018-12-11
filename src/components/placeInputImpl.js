@@ -1,10 +1,5 @@
-import {omit, clone} from 'lodash';
-import propsBinder from '../utils/propsBinder.js';
-import downArrowSimulator from '../utils/simulateArrowDown.js';
-import getPropsValuesMixin from '../utils/getPropsValuesMixin.js';
-import {
-  loaded
-} from '../manager.js';
+import {bindProps, getPropsValues} from '../utils/bindProps.js'
+import downArrowSimulator from '../utils/simulateArrowDown.js'
 
 const props = {
   bounds: {
@@ -20,8 +15,8 @@ const props = {
   },
   types: {
     type: Array,
-    default: function() {
-      return [];
+    default: function () {
+      return []
     }
   },
   placeholder: {
@@ -42,41 +37,39 @@ const props = {
     type: Boolean,
     default: false
   }
-};
+}
 
 export default {
-  mixins: [getPropsValuesMixin],
-
-  mounted() {
-    const input = this.$refs.input;
+  mounted () {
+    const input = this.$refs.input
 
     // Allow default place to be set
-    input.value = this.defaultPlace;
+    input.value = this.defaultPlace
     this.$watch('defaultPlace', () => {
-      input.value = this.defaultPlace;
-    });
+      input.value = this.defaultPlace
+    })
 
-    loaded.then(() => {
-      const options = clone(this.getPropsValues());
+    this.$gmapApiPromiseLazy().then(() => {
+      const options = getPropsValues(this, props)
       if (this.selectFirstOnEnter) {
-        downArrowSimulator(this.$refs.input);
+        downArrowSimulator(this.$refs.input)
       }
 
-      if(typeof(google.maps.places.Autocomplete) !== 'function'){
-        throw new Error('google.maps.places.Autocomplete is undefined. Did you add \'places\' to libraries when loading Google Maps?');
+      if (typeof (google.maps.places.Autocomplete) !== 'function') {
+        throw new Error('google.maps.places.Autocomplete is undefined. Did you add \'places\' to libraries when loading Google Maps?')
       }
 
-      this.autoCompleter = new google.maps.places.Autocomplete(this.$refs.input, options);
-      propsBinder(this, this.autoCompleter, omit(props, ['placeholder', 'place', 'selectFirstOnEnter',
-        'defaultPlace', 'className', 'label']));
+      this.autoCompleter = new google.maps.places.Autocomplete(this.$refs.input, options)
+      const {placeholder, place, defaultPlace, className, label, selectFirstOnEnter, ...rest} = props // eslint-disable-line
+      bindProps(this, this.autoCompleter, rest)
 
       this.autoCompleter.addListener('place_changed', () => {
-        this.$emit('place_changed', this.autoCompleter.getPlace());
-      });
-    });
+        this.$emit('place_changed', this.autoCompleter.getPlace())
+      })
+    })
   },
-  created() {
-    console.warn('The PlaceInput class is deprecated! Please consider using the Autocomplete input instead'); //eslint-disable-line no-console
+  created () {
+    console.warn('The PlaceInput class is deprecated! Please consider using the Autocomplete input instead') // eslint-disable-line no-console
   },
   props: props,
-};
+}

@@ -1,7 +1,11 @@
 <template>
-  <input type="text" :placeholder="placeholder" ref="input"
-    :value="value"/>
+  <input
+    ref="input"
+    v-bind="$attrs"
+    v-on="$listeners"
+    />
 </template>
 
-<script src="./autocompleteImpl.js">
+<script>
+export default (function (x) { return x.default || x })(require('./autocompleteImpl.js'))
 </script>

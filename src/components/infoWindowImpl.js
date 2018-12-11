@@ -1,19 +1,12 @@
-import {omit, clone} from 'lodash';
-import propsBinder from '../utils/propsBinder.js';
-import eventsBinder from '../utils/eventsBinder.js';
-import MapElementMixin from './mapElementMixin';
+import mapElementFactory from './mapElementFactory.js'
 
 const props = {
   options: {
     type: Object,
     required: false,
     default () {
-      return {};
+      return {}
     }
-  },
-  opened: {
-    type: Boolean,
-    default: true,
   },
   position: {
     type: Object,
@@ -23,78 +16,67 @@ const props = {
     type: Number,
     twoWay: true,
   }
-};
+}
 
 const events = [
   'domready',
   'closeclick',
   'content_changed',
-];
+]
 
-export default {
-  mixins: [MapElementMixin],
-  replace: false,
-  props: props,
-
-  mounted() {
-    const el = this.$refs.flyaway;
-    el.parentNode.removeChild(el);
+export default mapElementFactory({
+  mappedProps: props,
+  events,
+  name: 'infoWindow',
+  ctr: () => google.maps.InfoWindow,
+  props: {
+    opened: {
+      type: Boolean,
+      default: true,
+    },
   },
 
-  deferredReady() {
-    this.$markerObject = null;
-    this.$markerComponent = this.$findAncestor(
-      (ans) => ans.$markerObject
-    );
-
-    if (this.$markerComponent) {
-      this.$markerObject = this.$markerComponent.$markerObject;
+  inject: {
+    '$markerPromise': {
+      default: null,
     }
-    this.createInfoWindow();
   },
 
-  destroyed () {
-    if (this.disconnect) {
-      this.disconnect();
-    }
-    if (this.$infoWindow) {
-      this.$infoWindow.setMap(null);
+  mounted () {
+    const el = this.$refs.flyaway
+    el.parentNode.removeChild(el)
+  },
+
+  beforeCreate (options) {
+    options.content = this.$refs.flyaway
+
+    if (this.$markerPromise) {
+      delete options.position
+      return this.$markerPromise.then(mo => {
+        this.$markerObject = mo
+        return mo
+      })
     }
   },
 
   methods: {
-    openInfoWindow () {
-      if(this.opened) {
+    _openInfoWindow () {
+      if (this.opened) {
         if (this.$markerObject !== null) {
-          this.$infoWindow.open(this.$map, this.$markerObject);
+          this.$infoWindowObject.open(this.$map, this.$markerObject)
         } else {
-          this.$infoWindow.open(this.$map);
+          this.$infoWindowObject.open(this.$map)
         }
       } else {
-        this.$infoWindow.close();
+        this.$infoWindowObject.close()
       }
     },
-
-    createInfoWindow() {
-      // setting options
-      const options = clone(this.options);
-      options.content = this.$refs.flyaway;
-
-      // only set the position if the info window is not bound to a marker
-      if (this.$markerComponent === null) {
-        options.position = this.position;
-      }
-
-      this.$infoWindow = new google.maps.InfoWindow(options);
-
-      // Binding
-      propsBinder(this, this.$infoWindow, omit(props, ['opened']));
-      eventsBinder(this, this.$infoWindow, events);
-
-      this.openInfoWindow();
-      this.$watch('opened', () => {
-        this.openInfoWindow();
-      });
-    }
   },
-};
+
+  afterCreate () {
+    this._openInfoWindow()
+    this.$watch('opened', () => {
+      this._openInfoWindow()
+    })
+  }
+})

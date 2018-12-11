@@ -5,7 +5,8 @@
   </div>
 </template>
 
-<script src="./streetViewPanoramaImpl.js">
+<script>
+export default (function (x) { return x.default || x })(require('./streetViewPanoramaImpl.js'))
 </script>
 
 <style lang="css">

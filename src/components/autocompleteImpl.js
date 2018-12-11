@@ -1,17 +1,16 @@
-import { clone, pickBy, omit } from 'lodash'
-import propsBinder from '../utils/propsBinder.js'
+import {bindProps, getPropsValues} from '../utils/bindProps.js'
 import downArrowSimulator from '../utils/simulateArrowDown.js'
-import getPropsValuesMixin from '../utils/getPropsValuesMixin.js'
-import {
-  loaded
-} from '../manager.js'
+import {mappedPropsToVueProps} from './mapElementFactory'
 
-const props = {
+const mappedProps = {
   bounds: {
     type: Object
   },
   componentRestrictions: {
-    type: Object
+    type: Object,
+    // Do not bind -- must check for undefined
+    // in the property
+    noBind: true,
   },
   types: {
     type: Array,
@@ -19,18 +18,13 @@ const props = {
       return []
     }
   },
-  placeholder: {
-    required: false,
-    type: String
-  },
+}
+
+const props = {
   selectFirstOnEnter: {
-    require: false,
+    required: false,
     type: Boolean,
     default: false
-  },
-  value: {
-    type: String,
-    default: ''
   },
   options: {
     type: Object
@@ -38,40 +32,40 @@ const props = {
 }
 
 export default {
-  mixins: [getPropsValuesMixin],
-
   mounted () {
-    loaded.then(() => {
-      const options = clone(this.getPropsValues())
+    this.$gmapApiPromiseLazy().then(() => {
       if (this.selectFirstOnEnter) {
         downArrowSimulator(this.$refs.input)
       }
 
-      if(typeof(google.maps.places.Autocomplete) !== 'function'){
+      if (typeof (google.maps.places.Autocomplete) !== 'function') {
         throw new Error('google.maps.places.Autocomplete is undefined. Did you add \'places\' to libraries when loading Google Maps?')
       }
 
       /* eslint-disable no-unused-vars */
-      const finalOptions = pickBy(Object.assign(
-        {},
-        omit(options, ['options', 'selectFirstOnEnter', 'value', 'place', 'placeholder']),
-        options.options
-      ), (v, k) => v !== undefined)
+      const finalOptions = {
+        ...getPropsValues(this, mappedProps),
+        ...this.options
+      }
 
-      // Component restrictions is rather particular. Undefined not allowed
+      this.$autocomplete = new google.maps.places.Autocomplete(this.$refs.input, finalOptions)
+      bindProps(this, this.$autocomplete, mappedProps)
+
       this.$watch('componentRestrictions', v => {
         if (v !== undefined) {
           this.$autocomplete.setComponentRestrictions(v)
         }
       })
 
-      this.$autocomplete = new google.maps.places.Autocomplete(this.$refs.input, finalOptions)
-      propsBinder(this, this.$autocomplete, omit(props, ['placeholder', 'place', 'selectFirstOnEnter', 'value', 'componentRestrictions']))
-
+      // Not using `bindEvents` because we also want
+      // to return the result of `getPlace()`
       this.$autocomplete.addListener('place_changed', () => {
         this.$emit('place_changed', this.$autocomplete.getPlace())
       })
     })
   },
-  props: props
+  props: {
+    ...mappedPropsToVueProps(mappedProps),
+    ...props
+  }
 }

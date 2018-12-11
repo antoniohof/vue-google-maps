@@ -1,21 +1,21 @@
-/* vim: set softtabstop=2 shiftwidth=2 expandtab : */
-
 /**
   * @class Cluster
   * @prop $clusterObject -- Exposes the marker clusterer to
         descendent Marker classes. Override this if you area
         extending the class
-**/
 
-import {clone} from 'lodash';
-import eventsBinder from '../utils/eventsBinder.js';
-import propsBinder from '../utils/propsBinder.js';
-import MapElementMixin from './mapElementMixin';
-import getPropsValuesMixin from '../utils/getPropsValuesMixin.js';
-import MarkerClusterer from 'marker-clusterer-plus';
+  List of properties from
+  https://github.com/googlemaps/v3-utility-library/blob/master/markerclustererplus/src/markerclusterer.js
+**/
+import MarkerClusterer from 'marker-clusterer-plus'
+import mapElementFactory from './mapElementFactory.js'
 
 const props = {
   maxZoom: {
+    type: Number,
+    twoWay: false
+  },
+  batchSizeIE: {
     type: Number,
     twoWay: false
   },
@@ -23,15 +23,43 @@ const props = {
     type: Function,
     twoWay: false
   },
+  enableRetinaIcons: {
+    type: Boolean,
+    twoWay: false
+  },
   gridSize: {
+    type: Number,
+    twoWay: false
+  },
+  ignoreHidden: {
+    type: Boolean,
+    twoWay: false
+  },
+  imageExtension: {
+    type: String,
+    twoWay: false
+  },
+  imagePath: {
+    type: String,
+    twoWay: false
+  },
+  imageSizes: {
+    type: Array,
+    twoWay: false
+  },
+  minimumClusterSize: {
     type: Number,
     twoWay: false
   },
   styles: {
     type: Array,
     twoWay: false
+  },
+  zoomOnClick: {
+    type: Boolean,
+    twoWay: false
   }
-};
+}
 
 const events = [
   'click',
@@ -44,51 +72,60 @@ const events = [
   'mousedown',
   'mouseover',
   'mouseout'
-];
+]
 
+export default mapElementFactory({
+  mappedProps: props,
+  events,
+  name: 'cluster',
+  ctr: () => {
+    if (typeof MarkerClusterer === 'undefined') {
+      /* eslint-disable no-console */
+      console.error('MarkerClusterer is not installed! require() it or include it from https://cdnjs.cloudflare.com/ajax/libs/js-marker-clusterer/1.0.0/markerclusterer.js')
+      throw new Error('MarkerClusterer is not installed! require() it or include it from https://cdnjs.cloudflare.com/ajax/libs/js-marker-clusterer/1.0.0/markerclusterer.js')
+    }
+    return MarkerClusterer
+  },
+  ctrArgs: ({map, ...otherOptions}) => [map, [], otherOptions],
 
-export default {
-  mixins: [MapElementMixin, getPropsValuesMixin],
-  props: props,
-
-  render(h) {
+  render (h) {
     // <div><slot></slot></div>
     return h(
       'div',
       this.$slots.default
-    );
+    )
   },
 
-  deferredReady () {
-    const options = clone(this.getPropsValues());
-
-    if (typeof MarkerClusterer === 'undefined') {
-      /* eslint-disable no-console */
-      console.error('MarkerClusterer is not installed! require() it or include it from https://cdnjs.cloudflare.com/ajax/libs/js-marker-clusterer/1.0.0/markerclusterer.js');
-      throw new Error('MarkerClusterer is not installed! require() it or include it from https://cdnjs.cloudflare.com/ajax/libs/js-marker-clusterer/1.0.0/markerclusterer.js');
+  afterCreate (inst) {
+    const reinsertMarkers = () => {
+      const oldMarkers = inst.getMarkers()
+      inst.clearMarkers()
+      inst.addMarkers(oldMarkers)
     }
 
-    this.$clusterObject = new MarkerClusterer(this.$map, [], options);
-
-    propsBinder(this, this.$clusterObject, props, {
-      afterModelChanged: (a, v) => { // eslint-disable-line no-unused-vars
-        const oldMarkers = this.$clusterObject.getMarkers();
-        this.$clusterObject.clearMarkers();
-        this.$clusterObject.addMarkers(oldMarkers);
+    for (let prop in props) {
+      if (props[prop].twoWay) {
+        this.$on(prop.toLowerCase() + '_changed', reinsertMarkers)
       }
-    });
-    eventsBinder(this, this.$clusterObject, events);
+    }
   },
 
-  beforeDestroy() {
+  updated () {
+    if (this.$clusterObject) {
+      this.$clusterObject.repaint()
+    }
+  },
+
+  beforeDestroy () {
     /* Performance optimization when destroying a large number of markers */
     this.$children.forEach(marker => {
       if (marker.$clusterObject === this.$clusterObject) {
         marker.$clusterObject = null
       }
     })
+
     if (this.$clusterObject) {
-      this.$clusterObject.clearMarkers();
+      this.$clusterObject.clearMarkers()
     }
   },
-};
+})
